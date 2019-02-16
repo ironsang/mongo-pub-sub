@@ -19,6 +19,9 @@ public class ConsumerSessionHandlerImpl implements ConsumerSessionHandler {
     @Override
     public void removeConsumer(String id) {
         Disposable disposable = this.consumers.get(id);
-        disposable.dispose();
+
+        if (disposable != null) {
+            disposable.dispose();
+        }
     }
 }

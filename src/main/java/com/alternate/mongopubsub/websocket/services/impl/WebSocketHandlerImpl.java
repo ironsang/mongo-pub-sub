@@ -14,6 +14,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 import reactor.core.Disposable;
 
 import java.io.IOException;
+import java.util.Map;
 
 @Service
 public class WebSocketHandlerImpl extends TextWebSocketHandler {
@@ -50,37 +51,77 @@ public class WebSocketHandlerImpl extends TextWebSocketHandler {
 
         switch (command.getType()) {
             case PUBLISH:
-                this.messageBroker.publish(command.getHeaders().get("topic"), command.getContent());
-                session.sendMessage(new TextMessage(this.objectMapper.writeValueAsString(Message.builder()
-                        .withType("response")
-                        .withAttribute("status", "success")
-                        .build())));
+                this.handlePublishMessage(session, command.getHeaders().get("topic"), command.getContent());
                 break;
             case SUBSCRIBE:
-                Disposable disposable = this.messageBroker.subscribe(command.getHeaders().get("topic"))
-                        .subscribe(m -> {
-                            try {
-                                session.sendMessage(new TextMessage(this.objectMapper.writeValueAsString(Message.builder()
-                                        .withType("message")
-                                        .withAttribute("status", "success")
-                                        .build())));
-                            } catch (IOException e) {
-                                e.printStackTrace();
-                            }
-                        });
-                this.consumerSessionHandler.addConsumer(session.getId(), disposable);
+                this.handleSubscribeMessage(session, command.getHeaders().get("topic"));
                 break;
             case HEART_BEAT:
-                session.sendMessage(new TextMessage(this.objectMapper.writeValueAsString(Message.builder()
-                        .withType("heartbeat")
-                        .withPayload(null)
-                        .build())));
+                this.handleHearBeatMessage(session);
+                break;
             default:
-                session.sendMessage(new TextMessage(this.objectMapper.writeValueAsString(Message.builder()
-                        .withType("response")
-                        .withAttribute("status", "unsuccessful")
-                        .withAttribute("message", "unsupported command")
-                        .build())));
+                this.handleUnsupportedMessage(session);
         }
+    }
+
+    private void handlePublishMessage(WebSocketSession session, String topic, Map<String, Object> content) throws IOException {
+        if (topic == null || content == null) {
+            this.handleInvalidMessage(session);
+            return;
+        }
+
+        this.messageBroker.publish(topic, content);
+        session.sendMessage(new TextMessage(this.objectMapper.writeValueAsString(Message.builder()
+                .withType("response")
+                .withAttribute("status", "success")
+                .build())));
+    }
+
+    private void handleSubscribeMessage(WebSocketSession session, String topic) throws IOException {
+        if (topic == null) {
+            this.handleInvalidMessage(session);
+            return;
+        }
+
+        Disposable disposable = this.messageBroker.subscribe(topic)
+                .subscribe(m -> {
+                    try {
+                        session.sendMessage(new TextMessage(this.objectMapper.writeValueAsString(Message.builder()
+                                .withType("message")
+                                .withAttribute("status", "success")
+                                .build())));
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                });
+        this.consumerSessionHandler.addConsumer(session.getId(), disposable);
+
+        session.sendMessage(new TextMessage(this.objectMapper.writeValueAsString(Message.builder()
+                .withType("response")
+                .withAttribute("status", "success")
+                .build())));
+    }
+
+    private void handleHearBeatMessage(WebSocketSession session) throws IOException {
+        session.sendMessage(new TextMessage(this.objectMapper.writeValueAsString(Message.builder()
+                .withType("heartbeat")
+                .withPayload(null)
+                .build())));
+    }
+
+    private void handleUnsupportedMessage(WebSocketSession session) throws IOException {
+        session.sendMessage(new TextMessage(this.objectMapper.writeValueAsString(Message.builder()
+                .withType("response")
+                .withAttribute("status", "unsuccessful")
+                .withAttribute("message", "unsupported command")
+                .build())));
+    }
+
+    private void handleInvalidMessage(WebSocketSession session) throws IOException {
+        session.sendMessage(new TextMessage(this.objectMapper.writeValueAsString(Message.builder()
+                .withType("response")
+                .withAttribute("status", "unsuccessful")
+                .withAttribute("message", "invalid message body")
+                .build())));
     }
 }
