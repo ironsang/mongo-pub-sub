@@ -54,7 +54,7 @@ public class WebSocketHandlerImpl extends TextWebSocketHandler {
                 this.handlePublishMessage(session, command.getHeaders().get("topic"), command.getContent());
                 break;
             case SUBSCRIBE:
-                this.handleSubscribeMessage(session, command.getHeaders().get("topic"));
+                this.handleSubscribeMessage(session, command.getHeaders().get("topic"), command.getContent().get("filter"));
                 break;
             case HEART_BEAT:
                 this.handleHearBeatMessage(session);
@@ -77,13 +77,15 @@ public class WebSocketHandlerImpl extends TextWebSocketHandler {
                 .build())));
     }
 
-    private void handleSubscribeMessage(WebSocketSession session, String topic) throws IOException {
+    private void handleSubscribeMessage(WebSocketSession session, String topic, Object object) throws IOException {
         if (topic == null) {
             this.handleInvalidMessage(session);
             return;
         }
 
-        Disposable disposable = this.messageBroker.subscribe(topic)
+        Map<String, Object> filter = (object != null) ? (Map<String, Object>) object : null;
+
+        Disposable disposable = this.messageBroker.subscribe(topic, filter)
                 .subscribe(m -> {
                     try {
                         session.sendMessage(new TextMessage(this.objectMapper.writeValueAsString(Message.builder()

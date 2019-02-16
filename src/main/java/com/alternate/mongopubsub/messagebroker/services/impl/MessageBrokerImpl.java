@@ -46,9 +46,16 @@ public class MessageBrokerImpl implements MessageBroker {
     }
 
     @Override
-    public Flux<Map<String, Object>> subscribe(String topic) {
-        return this.messagFlux
-                .filter(messageWrapper -> messageWrapper.getTopic().equals(topic))
+    public Flux<Map<String, Object>> subscribe(String topic, Map<String, Object> filter) {
+        Flux<MessageWrapper> messageWrapperFlux = this.messagFlux
+                .filter(messageWrapper -> messageWrapper.getTopic().equals(topic));
+
+        for (String key: filter.keySet()) {
+            Object value = filter.get(key);
+            messageWrapperFlux = messageWrapperFlux.filter(m -> m.getPayload().get(key).equals(value));
+        }
+
+        return messageWrapperFlux
                 .map(MessageWrapper::getPayload);
     }
 
