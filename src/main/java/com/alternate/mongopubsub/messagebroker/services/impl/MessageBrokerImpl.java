@@ -42,7 +42,7 @@ public class MessageBrokerImpl implements MessageBroker {
 
     @Override
     public void publish(String topic, Map<String, Object> payload) {
-        this.executor.submit(() -> this.publishDocument(topic, payload));
+        this.executor.submit(() -> this.persistDocument(topic, payload));
     }
 
     @Override
@@ -76,21 +76,23 @@ public class MessageBrokerImpl implements MessageBroker {
         this.scheduler.scheduleAtFixedRate(() -> {
             while (cursor.hasNext()) {
                 ChangeStreamDocument<Document> document = cursor.next();
-                this.listenDocument(document);
+                this.processDocument(document);
             }
         }, 1, 1, TimeUnit.SECONDS);
     }
 
-    private void listenDocument(ChangeStreamDocument<Document> document) {
-        String collectionName = document.getNamespace() != null ? document.getNamespace().getCollectionName() : "null";
+    private void processDocument(ChangeStreamDocument<Document> document) {
+        String topic = document.getNamespace() != null ? document.getNamespace().getCollectionName() : "null";
+        Map<String, Object> payload = document.getFullDocument();
+        payload.put("_id", document.getDocumentKey().get("_id").asObjectId().getValue().toString());
 
         this.messagFluxSink.next(MessageWrapper.builder()
-                .withTopic(collectionName)
-                .withPayload(document.getFullDocument())
+                .withTopic(topic)
+                .withPayload(payload)
                 .build());
     }
 
-    private void publishDocument(String topic, Map<String, Object> payload) {
+    private void persistDocument(String topic, Map<String, Object> payload) {
         MongoCollection<Document> collection = this.mongoDatabase.getCollection(topic);
 
         Document document = new Document();
