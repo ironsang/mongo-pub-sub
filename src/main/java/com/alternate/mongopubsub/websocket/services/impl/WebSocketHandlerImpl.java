@@ -42,7 +42,7 @@ public class WebSocketHandlerImpl extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        this.consumerSessionHandler.removeConsumer(session.getId());
+        this.consumerSessionHandler.removeSubscriber(session.getId());
     }
 
     @Override
@@ -88,13 +88,13 @@ public class WebSocketHandlerImpl extends TextWebSocketHandler {
                     try {
                         session.sendMessage(new TextMessage(this.objectMapper.writeValueAsString(Message.builder()
                                 .withType("message")
-                                .withAttribute("status", "success")
+                                .withPayload(m)
                                 .build())));
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
                 });
-        this.consumerSessionHandler.addConsumer(session.getId(), disposable);
+        this.consumerSessionHandler.subscribeTopic(session.getId(), topic, disposable);
 
         session.sendMessage(new TextMessage(this.objectMapper.writeValueAsString(Message.builder()
                 .withType("response")

@@ -82,8 +82,10 @@ public class MessageBrokerImpl implements MessageBroker {
     }
 
     private void listenDocument(ChangeStreamDocument<Document> document) {
+        String collectionName = document.getNamespace() != null ? document.getNamespace().getCollectionName() : "null";
+
         this.messagFluxSink.next(MessageWrapper.builder()
-                .withTopic(document.getDatabaseName())
+                .withTopic(collectionName)
                 .withPayload(document.getFullDocument())
                 .build());
     }
