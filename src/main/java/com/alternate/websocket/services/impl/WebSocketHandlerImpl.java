@@ -1,10 +1,9 @@
 package com.alternate.websocket.services.impl;
 
 import com.alternate.messagebroker.services.MessageBroker;
-import com.alternate.websocket.models.Command;
 import com.alternate.websocket.models.Message;
+import com.alternate.websocket.models.MessageType;
 import com.alternate.websocket.services.ConsumerSessionHandler;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,9 +38,10 @@ public class WebSocketHandlerImpl extends TextWebSocketHandler {
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         LOGGER.info("client: {} connected", session.getId());
         Message message = Message.builder()
-                .withType("response")
-                .withAttribute("status", "success")
-                .withAttribute("scope", "publish | subscribe")
+                .withType(MessageType.RESPONSE)
+                .withHeaders(null)
+                .withContentAttribute("status", "success")
+                .withContentAttribute("scope", "publish | subscribe")
                 .build();
         this.sendMessage(session, message);
     }
@@ -55,20 +55,40 @@ public class WebSocketHandlerImpl extends TextWebSocketHandler {
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage textMessage) throws IOException {
         LOGGER.info("message: {} received from client: {}", textMessage.getPayload(), session.getId());
-        Command command = this.objectMapper.readValue(textMessage.getPayload(), Command.class);
+        Message message = this.objectMapper.readValue(textMessage.getPayload(), Message.class);
 
-        switch (command.getType()) {
-            case PUBLISH:
-                this.handlePublishMessage(session, command.getHeaders().get("topic"), command.getContent());
+        if (message.getType() != MessageType.HEART_BEAT && message.getType() != MessageType.COMMAND) {
+            this.handleUnsupportedMessage(session);
+            return;
+        }
+
+        if (message.getType() == MessageType.HEART_BEAT) {
+            this.handleHearBeatMessage(session);
+            return;
+        }
+
+        if (message.getHeaders() == null) {
+            this.handleInvalidMessage(session);
+            return;
+        }
+
+        String command = message.getHeaders().get("command");
+
+        if (command == null) {
+            this.handleInvalidMessage(session);
+            return;
+        }
+
+        switch (command) {
+            case "PUBLISH":
+                this.handlePublishMessage(session, message.getHeaders().get("topic"), message.getContent());
                 break;
-            case SUBSCRIBE:
-                this.handleSubscribeMessage(session, command.getHeaders().get("topic"), command.getContent().get("filter"));
-                break;
-            case HEART_BEAT:
-                this.handleHearBeatMessage(session);
+            case "SUBSCRIBE":
+                this.handleSubscribeMessage(session, message.getHeaders().get("topic"), message.getContent().get("filter"));
                 break;
             default:
                 this.handleUnsupportedMessage(session);
+                break;
         }
     }
 
@@ -80,8 +100,9 @@ public class WebSocketHandlerImpl extends TextWebSocketHandler {
 
         this.messageBroker.publish(topic, content);
         Message message = Message.builder()
-                .withType("response")
-                .withAttribute("status", "success")
+                .withType(MessageType.RESPONSE)
+                .withHeaders(null)
+                .withContentAttribute("status", "success")
                 .build();
         this.sendMessage(session, message);
     }
@@ -98,8 +119,9 @@ public class WebSocketHandlerImpl extends TextWebSocketHandler {
                 .subscribe(m -> {
                     try {
                         Message message = Message.builder()
-                                .withType("message")
-                                .withPayload(m)
+                                .withType(MessageType.MESSAGE)
+                                .withHeaders(null)
+                                .withContent(m)
                                 .build();
                         this.sendMessage(session, message);
                     } catch (IOException e) {
@@ -109,34 +131,38 @@ public class WebSocketHandlerImpl extends TextWebSocketHandler {
         this.consumerSessionHandler.subscribeTopic(session.getId(), topic, disposable);
 
         Message message = Message.builder()
-                .withType("response")
-                .withAttribute("status", "success")
+                .withType(MessageType.RESPONSE)
+                .withHeaders(null)
+                .withContentAttribute("status", "success")
                 .build();
         this.sendMessage(session, message);
     }
 
     private void handleHearBeatMessage(WebSocketSession session) throws IOException {
         Message message = Message.builder()
-                .withType("heartbeat")
-                .withPayload(null)
+                .withType(MessageType.HEART_BEAT)
+                .withHeaders(null)
+                .withContent(null)
                 .build();
         this.sendMessage(session, message);
     }
 
     private void handleUnsupportedMessage(WebSocketSession session) throws IOException {
         Message message = Message.builder()
-                .withType("response")
-                .withAttribute("status", "unsuccessful")
-                .withAttribute("message", "unsupported command")
+                .withType(MessageType.RESPONSE)
+                .withHeaders(null)
+                .withContentAttribute("status", "unsuccessful")
+                .withContentAttribute("message", "unsupported command")
                 .build();
         this.sendMessage(session, message);
     }
 
     private void handleInvalidMessage(WebSocketSession session) throws IOException {
         Message message = Message.builder()
-                .withType("response")
-                .withAttribute("status", "unsuccessful")
-                .withAttribute("message", "invalid message body")
+                .withType(MessageType.RESPONSE)
+                .withHeaders(null)
+                .withContentAttribute("status", "unsuccessful")
+                .withContentAttribute("message", "invalid message body")
                 .build();
         this.sendMessage(session, message);
     }

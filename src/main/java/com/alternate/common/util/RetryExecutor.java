@@ -1,7 +1,13 @@
 package com.alternate.common.util;
 
 import java.util.Map;
-import java.util.concurrent.*;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 public class RetryExecutor extends ThreadPoolExecutor {
     private final long maxRetries;
@@ -18,7 +24,7 @@ public class RetryExecutor extends ThreadPoolExecutor {
         super.afterExecute(r, t);
         if (t != null && shouldRetry(r)) {
             retry(r);
-        }  else if (t == null && r instanceof Future<?>) {
+        } else if (t == null && r instanceof Future<?>) {
             try {
                 ((Future<?>) r).get();
             } catch (CancellationException | ExecutionException e) {

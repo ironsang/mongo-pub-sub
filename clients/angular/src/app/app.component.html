@@ -1,0 +1,19 @@
+<!--The content below is only a placeholder and can be replaced.-->
+<div style="text-align:center">
+  <h1>
+    Welcome
+  </h1>
+</div>
+<h2>Events</h2>
+<ul>
+  <li>
+    <button (click)="sendEvent('AddNewField')">AddNewField (Processed: {{eventStatus.AddNewField}})</button>
+  </li>
+  <li>
+    <button (click)="sendEvent('DeleteField')">DeleteField (Processed: {{eventStatus.DeleteField}})</button>
+  </li>
+  <li>
+    <button (click)="sendEvent('EditField')">EditField (Processed: {{eventStatus.EditField}})</button>
+  </li>
+</ul>
+

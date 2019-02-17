@@ -12,6 +12,7 @@ import com.mongodb.client.model.changestream.ChangeStreamDocument;
 import com.mongodb.client.model.changestream.FullDocument;
 import org.bson.Document;
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -107,12 +108,16 @@ public class MessageBrokerImpl implements MessageBroker {
     private void persistDocument(String topic, Map<String, Object> payload) {
         MongoCollection<Document> collection = this.mongoDatabase.getCollection(topic);
 
-        String id = String.valueOf(payload.get("_id"));
+        String id = (String) payload.get("_id");
         payload.remove("_id");
 
         Document document = new Document();
         payload.forEach(document::append);
 
-        collection.replaceOne(Filters.eq("_id", id), document, new ReplaceOptions().upsert(true));
+        if (id == null) {
+            collection.insertOne(document);
+        } else {
+            collection.replaceOne(Filters.eq("_id", new ObjectId(id)), document, new ReplaceOptions().upsert(true));
+        }
     }
 }

@@ -7,20 +7,30 @@ import java.util.Map;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class Message {
-    private final String type;
-    private final Map<String, Object> payload;
+    private MessageType type;
+    private Map<String, String> headers;
+    private Map<String, Object> content;
+
+    private Message() {
+        // for jackson databind
+    }
 
     private Message(MessageBuilder builder) {
         this.type = builder.type;
-        this.payload = builder.payload;
+        this.headers = builder.headers;
+        this.content = builder.content;
     }
 
-    public String getType() {
+    public MessageType getType() {
         return type;
     }
 
-    public Map<String, Object> getPayload() {
-        return payload;
+    public Map<String, String> getHeaders() {
+        return headers;
+    }
+
+    public Map<String, Object> getContent() {
+        return content;
     }
 
     public static MessageBuilder builder() {
@@ -28,21 +38,32 @@ public class Message {
     }
 
     public static class MessageBuilder {
-        private String type;
-        private Map<String, Object> payload = new HashMap<>();
+        private MessageType type;
+        private Map<String, String> headers = new HashMap<>();
+        private Map<String, Object> content = new HashMap<>();
 
-        public MessageBuilder withType(String type) {
+        public MessageBuilder withType(MessageType type) {
             this.type = type;
             return this;
         }
 
-        public MessageBuilder withPayload(Map<String, Object> payload) {
-            this.payload = payload;
+        public MessageBuilder withHeaders(Map<String, String> headers) {
+            this.headers = headers;
             return this;
         }
 
-        public MessageBuilder withAttribute(String key, Object value) {
-            this.payload.put(key, value);
+        public MessageBuilder withContent(Map<String, Object> content) {
+            this.content = content;
+            return this;
+        }
+
+        public MessageBuilder withHeaderAttribute(String key, String value) {
+            this.headers.put(key, value);
+            return this;
+        }
+
+        public MessageBuilder withContentAttribute(String key, Object value) {
+            this.content.put(key, value);
             return this;
         }
 
