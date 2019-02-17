@@ -1,5 +1,6 @@
 package com.alternate.mongopubsub.messagebroker.services.impl;
 
+import com.alternate.mongopubsub.common.util.Executors2;
 import com.alternate.mongopubsub.messagebroker.models.MessageWrapper;
 import com.alternate.mongopubsub.messagebroker.services.MessageBroker;
 import com.mongodb.BasicDBObject;
@@ -75,10 +76,12 @@ public class MessageBrokerImpl implements MessageBroker {
                 Filters.in("operationType", Arrays.asList("insert", "update", "replace"))
         ));
 
-        this.mongoDatabase
-                .watch(pipeline)
-                .fullDocument(FullDocument.UPDATE_LOOKUP)
-                .forEach((Consumer<? super ChangeStreamDocument<Document>>) this::processDocument);
+        Executors2.newRetrySingleThreadExecutor(5).submit(() -> {
+            this.mongoDatabase
+                    .watch(pipeline)
+                    .fullDocument(FullDocument.UPDATE_LOOKUP)
+                    .forEach((Consumer<? super ChangeStreamDocument<Document>>) this::processDocument);
+        });
     }
 
     private void processDocument(ChangeStreamDocument<Document> document) {
