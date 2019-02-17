@@ -4,7 +4,6 @@ import com.alternate.mongopubsub.messagebroker.models.MessageWrapper;
 import com.alternate.mongopubsub.messagebroker.services.MessageBroker;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCollection;
-import com.mongodb.client.MongoCursor;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
@@ -19,16 +18,17 @@ import reactor.core.publisher.DirectProcessor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 @Service
 public class MessageBrokerImpl implements MessageBroker {
     private ExecutorService executor;
-    private ScheduledExecutorService scheduler;
     private Flux<MessageWrapper> messagFlux;
     private FluxSink<MessageWrapper> messagFluxSink;
 
@@ -50,9 +50,10 @@ public class MessageBrokerImpl implements MessageBroker {
         Flux<MessageWrapper> messageWrapperFlux = this.messagFlux
                 .filter(messageWrapper -> messageWrapper.getTopic().equals(topic));
 
-        for (String key: filter.keySet()) {
+        for (String key : filter.keySet()) {
             Object value = filter.get(key);
-            messageWrapperFlux = messageWrapperFlux.filter(m -> m.getPayload().get(key).equals(value));
+            messageWrapperFlux = messageWrapperFlux
+                    .filter(m -> m.getPayload().get(key).equals(value));
         }
 
         return messageWrapperFlux
@@ -61,7 +62,6 @@ public class MessageBrokerImpl implements MessageBroker {
 
     private void init() {
         this.executor = Executors.newSingleThreadExecutor();
-        this.scheduler = Executors.newSingleThreadScheduledExecutor();
 
         final DirectProcessor<MessageWrapper> directProcessor = DirectProcessor.create();
         this.messagFlux = directProcessor.onBackpressureBuffer();
@@ -75,17 +75,10 @@ public class MessageBrokerImpl implements MessageBroker {
                 Filters.in("operationType", Arrays.asList("insert", "update", "replace"))
         ));
 
-        MongoCursor<ChangeStreamDocument<Document>> cursor = this.mongoDatabase
+        this.mongoDatabase
                 .watch(pipeline)
                 .fullDocument(FullDocument.UPDATE_LOOKUP)
-                .iterator();
-
-        this.scheduler.scheduleAtFixedRate(() -> {
-            while (cursor.hasNext()) {
-                ChangeStreamDocument<Document> document = cursor.next();
-                this.processDocument(document);
-            }
-        }, 1, 1, TimeUnit.SECONDS);
+                .forEach((Consumer<? super ChangeStreamDocument<Document>>) this::processDocument);
     }
 
     private void processDocument(ChangeStreamDocument<Document> document) {
