@@ -1,4 +1,4 @@
-package com.alternate.mongopubsub;
+package com.alternate;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;

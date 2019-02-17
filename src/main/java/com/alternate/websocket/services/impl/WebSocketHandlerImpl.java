@@ -1,10 +1,13 @@
-package com.alternate.mongopubsub.websocket.services.impl;
+package com.alternate.websocket.services.impl;
 
-import com.alternate.mongopubsub.messagebroker.services.MessageBroker;
-import com.alternate.mongopubsub.websocket.models.Command;
-import com.alternate.mongopubsub.websocket.models.Message;
-import com.alternate.mongopubsub.websocket.services.ConsumerSessionHandler;
+import com.alternate.messagebroker.services.MessageBroker;
+import com.alternate.websocket.models.Command;
+import com.alternate.websocket.models.Message;
+import com.alternate.websocket.services.ConsumerSessionHandler;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.socket.CloseStatus;
@@ -19,6 +22,8 @@ import java.util.Map;
 @Service
 public class WebSocketHandlerImpl extends TextWebSocketHandler {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(WebSocketHandlerImpl.class);
+
     private final ObjectMapper objectMapper;
     private final ConsumerSessionHandler consumerSessionHandler;
     private final MessageBroker messageBroker;
@@ -32,21 +37,24 @@ public class WebSocketHandlerImpl extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+        LOGGER.info("client: {} connected", session.getId());
         Message message = Message.builder()
                 .withType("response")
                 .withAttribute("status", "success")
                 .withAttribute("scope", "publish | subscribe")
                 .build();
-        session.sendMessage(new TextMessage(this.objectMapper.writeValueAsString(message)));
+        this.sendMessage(session, message);
     }
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
+        LOGGER.info("client: {} disconnected", session.getId());
         this.consumerSessionHandler.removeSubscriber(session.getId());
     }
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage textMessage) throws IOException {
+        LOGGER.info("message: {} received from client: {}", textMessage.getPayload(), session.getId());
         Command command = this.objectMapper.readValue(textMessage.getPayload(), Command.class);
 
         switch (command.getType()) {
@@ -71,10 +79,11 @@ public class WebSocketHandlerImpl extends TextWebSocketHandler {
         }
 
         this.messageBroker.publish(topic, content);
-        session.sendMessage(new TextMessage(this.objectMapper.writeValueAsString(Message.builder()
+        Message message = Message.builder()
                 .withType("response")
                 .withAttribute("status", "success")
-                .build())));
+                .build();
+        this.sendMessage(session, message);
     }
 
     private void handleSubscribeMessage(WebSocketSession session, String topic, Object object) throws IOException {
@@ -88,42 +97,53 @@ public class WebSocketHandlerImpl extends TextWebSocketHandler {
         Disposable disposable = this.messageBroker.subscribe(topic, filter)
                 .subscribe(m -> {
                     try {
-                        session.sendMessage(new TextMessage(this.objectMapper.writeValueAsString(Message.builder()
+                        Message message = Message.builder()
                                 .withType("message")
                                 .withPayload(m)
-                                .build())));
+                                .build();
+                        this.sendMessage(session, message);
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
                 });
         this.consumerSessionHandler.subscribeTopic(session.getId(), topic, disposable);
 
-        session.sendMessage(new TextMessage(this.objectMapper.writeValueAsString(Message.builder()
+        Message message = Message.builder()
                 .withType("response")
                 .withAttribute("status", "success")
-                .build())));
+                .build();
+        this.sendMessage(session, message);
     }
 
     private void handleHearBeatMessage(WebSocketSession session) throws IOException {
-        session.sendMessage(new TextMessage(this.objectMapper.writeValueAsString(Message.builder()
+        Message message = Message.builder()
                 .withType("heartbeat")
                 .withPayload(null)
-                .build())));
+                .build();
+        this.sendMessage(session, message);
     }
 
     private void handleUnsupportedMessage(WebSocketSession session) throws IOException {
-        session.sendMessage(new TextMessage(this.objectMapper.writeValueAsString(Message.builder()
+        Message message = Message.builder()
                 .withType("response")
                 .withAttribute("status", "unsuccessful")
                 .withAttribute("message", "unsupported command")
-                .build())));
+                .build();
+        this.sendMessage(session, message);
     }
 
     private void handleInvalidMessage(WebSocketSession session) throws IOException {
-        session.sendMessage(new TextMessage(this.objectMapper.writeValueAsString(Message.builder()
+        Message message = Message.builder()
                 .withType("response")
                 .withAttribute("status", "unsuccessful")
                 .withAttribute("message", "invalid message body")
-                .build())));
+                .build();
+        this.sendMessage(session, message);
+    }
+
+    private void sendMessage(WebSocketSession session, Message message) throws IOException {
+        String messageString = this.objectMapper.writeValueAsString(message);
+        session.sendMessage(new TextMessage(messageString));
+        LOGGER.info("message: {} sent to client: {}", messageString, session.getId());
     }
 }

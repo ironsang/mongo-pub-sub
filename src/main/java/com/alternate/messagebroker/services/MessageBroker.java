@@ -1,4 +1,4 @@
-package com.alternate.mongopubsub.messagebroker.services;
+package com.alternate.messagebroker.services;
 
 import reactor.core.publisher.Flux;
 

@@ -1,4 +1,4 @@
-package com.alternate.mongopubsub.messagebroker.models;
+package com.alternate.messagebroker.models;
 
 import java.util.Map;
 

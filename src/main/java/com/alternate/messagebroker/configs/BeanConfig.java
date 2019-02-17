@@ -1,4 +1,4 @@
-package com.alternate.mongopubsub.messagebroker.configs;
+package com.alternate.messagebroker.configs;
 
 import com.mongodb.MongoClient;
 import com.mongodb.client.MongoDatabase;

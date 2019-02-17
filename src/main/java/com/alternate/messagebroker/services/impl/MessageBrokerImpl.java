@@ -1,18 +1,19 @@
-package com.alternate.mongopubsub.messagebroker.services.impl;
+package com.alternate.messagebroker.services.impl;
 
-import com.alternate.mongopubsub.common.util.Executors2;
-import com.alternate.mongopubsub.messagebroker.models.MessageWrapper;
-import com.alternate.mongopubsub.messagebroker.services.MessageBroker;
-import com.mongodb.BasicDBObject;
+import com.alternate.common.util.Executors2;
+import com.alternate.messagebroker.models.MessageWrapper;
+import com.alternate.messagebroker.services.MessageBroker;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.UpdateOptions;
+import com.mongodb.client.model.ReplaceOptions;
 import com.mongodb.client.model.changestream.ChangeStreamDocument;
 import com.mongodb.client.model.changestream.FullDocument;
 import org.bson.Document;
 import org.bson.conversions.Bson;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.DirectProcessor;
@@ -29,6 +30,9 @@ import java.util.function.Consumer;
 
 @Service
 public class MessageBrokerImpl implements MessageBroker {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(MessageBrokerImpl.class);
+
     private ExecutorService executor;
     private Flux<MessageWrapper> messagFlux;
     private FluxSink<MessageWrapper> messagFluxSink;
@@ -44,6 +48,7 @@ public class MessageBrokerImpl implements MessageBroker {
     @Override
     public void publish(String topic, Map<String, Object> payload) {
         this.executor.submit(() -> this.persistDocument(topic, payload));
+        LOGGER.info("client submitted message to topic: {}", topic);
     }
 
     @Override
@@ -57,6 +62,7 @@ public class MessageBrokerImpl implements MessageBroker {
                     .filter(m -> m.getPayload().get(key).equals(value));
         }
 
+        LOGGER.info("client subscribed to topic: {}", topic);
         return messageWrapperFlux
                 .map(MessageWrapper::getPayload);
     }
@@ -77,6 +83,7 @@ public class MessageBrokerImpl implements MessageBroker {
         ));
 
         Executors2.newRetrySingleThreadExecutor(5).submit(() -> {
+            LOGGER.info("mongo change stream listener started");
             this.mongoDatabase
                     .watch(pipeline)
                     .fullDocument(FullDocument.UPDATE_LOOKUP)
@@ -87,21 +94,25 @@ public class MessageBrokerImpl implements MessageBroker {
     private void processDocument(ChangeStreamDocument<Document> document) {
         String topic = document.getNamespace() != null ? document.getNamespace().getCollectionName() : "null";
         Map<String, Object> payload = document.getFullDocument();
-        payload.put("_id", document.getDocumentKey().get("_id").asObjectId().getValue().toString());
+        String id = document.getDocumentKey().get("_id").asObjectId().getValue().toString();
+        payload.put("_id", id);
 
         this.messagFluxSink.next(MessageWrapper.builder()
                 .withTopic(topic)
                 .withPayload(payload)
                 .build());
+        LOGGER.info("message published to topic: {}", id, topic);
     }
 
     private void persistDocument(String topic, Map<String, Object> payload) {
         MongoCollection<Document> collection = this.mongoDatabase.getCollection(topic);
 
-        Document document = new Document();
+        String id = String.valueOf(payload.get("_id"));
         payload.remove("_id");
+
+        Document document = new Document();
         payload.forEach(document::append);
 
-        collection.updateOne(new Document(), new BasicDBObject("$set", document), new UpdateOptions().upsert(true));
+        collection.replaceOne(Filters.eq("_id", id), document, new ReplaceOptions().upsert(true));
     }
 }

@@ -1,4 +1,4 @@
-package com.alternate.mongopubsub.websocket.services;
+package com.alternate.websocket.services;
 
 import reactor.core.Disposable;
 

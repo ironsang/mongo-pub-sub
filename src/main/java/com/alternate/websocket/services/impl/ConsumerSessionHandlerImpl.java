@@ -1,6 +1,8 @@
-package com.alternate.mongopubsub.websocket.services.impl;
+package com.alternate.websocket.services.impl;
 
-import com.alternate.mongopubsub.websocket.services.ConsumerSessionHandler;
+import com.alternate.websocket.services.ConsumerSessionHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import reactor.core.Disposable;
 
@@ -9,6 +11,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class ConsumerSessionHandlerImpl implements ConsumerSessionHandler {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(ConsumerSessionHandlerImpl.class);
+
     private Map<String, Map<String, Disposable>> consumers = new ConcurrentHashMap<>();
 
     @Override
@@ -17,6 +22,7 @@ public class ConsumerSessionHandlerImpl implements ConsumerSessionHandler {
 
         Map<String, Disposable> disposableMap = this.consumers.computeIfAbsent(id, k -> new ConcurrentHashMap<>());
         disposableMap.put(topic, disposable);
+        LOGGER.info("client: {} session saved for: {}", id, topic);
     }
 
     @Override
@@ -35,6 +41,7 @@ public class ConsumerSessionHandlerImpl implements ConsumerSessionHandler {
 
         disposable.dispose();
         disposableMap.remove(topic);
+        LOGGER.info("client: {} session removed for: {}", id, topic);
     }
 
     @Override
@@ -47,11 +54,13 @@ public class ConsumerSessionHandlerImpl implements ConsumerSessionHandler {
 
         disposableMap.values().forEach(Disposable::dispose);
         disposableMap.clear();
+        LOGGER.info("client: {} unsubscribed all sessions", id);
     }
 
     @Override
     public void removeSubscriber(String id) {
         this.unsubscribeAllTopics(id);
         this.consumers.remove(id);
+        LOGGER.info("client: {} removed", id);
     }
 }

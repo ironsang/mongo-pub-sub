@@ -1,4 +1,4 @@
-package com.alternate.mongopubsub.common.util;
+package com.alternate.common.util;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;

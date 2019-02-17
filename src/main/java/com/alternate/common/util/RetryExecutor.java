@@ -1,4 +1,4 @@
-package com.alternate.mongopubsub.common.util;
+package com.alternate.common.util;
 
 import java.util.Map;
 import java.util.concurrent.*;

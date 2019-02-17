@@ -1,4 +1,4 @@
-package com.alternate.mongopubsub.websocket.configs;
+package com.alternate.websocket.configs;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;

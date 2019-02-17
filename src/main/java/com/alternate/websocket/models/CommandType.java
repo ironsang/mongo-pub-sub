@@ -1,4 +1,4 @@
-package com.alternate.mongopubsub.websocket.models;
+package com.alternate.websocket.models;
 
 public enum CommandType {
     HEART_BEAT,
